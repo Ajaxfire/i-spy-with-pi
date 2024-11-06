@@ -2,7 +2,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Raspberry Pi Camera</title>
+    <title>AjaxPi Camera</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -38,7 +38,6 @@
             padding: 10px;
             display: none;
         }
-        /* Toggle switch styles */
         .switch {
             position: relative;
             display: inline-block;
@@ -112,6 +111,14 @@
         const captureButton = document.getElementById('capture');
         const cameraFeed = document.getElementById('camera-feed');
         const status = document.getElementById('status');
+        let feedUrl = '';
+
+        function refreshFeed() {
+            if (cameraFeed.style.display === 'block') {
+                feedUrl = '/video_feed?t=' + new Date().getTime();
+                cameraFeed.src = feedUrl;
+            }
+        }
 
         toggleSwitch.addEventListener('change', async () => {
             if (toggleSwitch.checked) {
@@ -120,7 +127,8 @@
                 const data = await response.json();
                 
                 if (data.status === 'success') {
-                    cameraFeed.src = '/video_feed';
+                    feedUrl = '/video_feed?t=' + new Date().getTime();
+                    cameraFeed.src = feedUrl;
                     cameraFeed.style.display = 'block';
                     captureButton.disabled = false;
                 } else {
@@ -147,6 +155,9 @@
                 status.style.display = 'block';
                 status.style.backgroundColor = '#dff0d8';
                 status.textContent = `Photo captured: ${data.filename}`;
+                
+                // Refresh the feed after capture
+                setTimeout(refreshFeed, 100);
             } else {
                 status.style.display = 'block';
                 status.style.backgroundColor = '#f2dede';
@@ -157,6 +168,9 @@
                 status.style.display = 'none';
             }, 3000);
         });
+
+        // Periodically refresh feed to maintain performance
+        setInterval(refreshFeed, 30000);  // Refresh every 30 seconds
     </script>
 </body>
 </html>

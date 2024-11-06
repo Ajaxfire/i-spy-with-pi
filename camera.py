@@ -4,12 +4,16 @@ import cv2
 import os
 from datetime import datetime
 from pathlib import Path
+import threading
+import time
 
 app = Flask(__name__)
 
-# Global variable for camera
+# Global variables
 camera = None
 picture_folder = str(Path.home() / "Pictures" / "camera_captures")
+frame_buffer = None
+frame_lock = threading.Lock()
 
 # Ensure pictures directory exists
 os.makedirs(picture_folder, exist_ok=True)
@@ -17,20 +21,38 @@ os.makedirs(picture_folder, exist_ok=True)
 def get_camera():
     global camera
     if camera is None:
-        camera = cv2.VideoCapture(0)  # Use first USB camera
+        camera = cv2.VideoCapture(0)
+        # Optimize camera settings
+        camera.set(cv2.CAP_PROP_FRAME_WIDTH, 640)  # Reduce resolution for better performance
+        camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+        camera.set(cv2.CAP_PROP_FPS, 30)  # Set FPS
+        camera.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # Minimize buffer size
     return camera
 
-def generate_frames():
-    camera = get_camera()
+def update_frame_buffer():
+    global frame_buffer
     while True:
+        camera = get_camera()
+        if camera is None:
+            time.sleep(0.1)
+            continue
+            
         success, frame = camera.read()
-        if not success:
-            break
-        else:
-            ret, buffer = cv2.imencode('.jpg', frame)
-            frame = buffer.tobytes()
-            yield (b'--frame\r\n'
-                   b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+        if success:
+            # Optimize frame for web streaming
+            ret, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
+            if ret:
+                with frame_lock:
+                    frame_buffer = buffer.tobytes()
+        time.sleep(0.033)  # ~30 FPS
+
+def generate_frames():
+    while True:
+        with frame_lock:
+            if frame_buffer is not None:
+                yield (b'--frame\r\n'
+                       b'Content-Type: image/jpeg\r\n\r\n' + frame_buffer + b'\r\n')
+        time.sleep(0.033)  # ~30 FPS
 
 @app.route('/')
 def index():
@@ -68,5 +90,9 @@ def stop_camera():
         camera = None
     return jsonify({"status": "success"})
 
+# Start frame buffer update thread
+frame_thread = threading.Thread(target=update_frame_buffer, daemon=True)
+frame_thread.start()
+
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5000, threaded=True)
