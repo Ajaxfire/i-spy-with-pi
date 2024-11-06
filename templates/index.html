@@ -1,0 +1,162 @@
+<!-- templates/index.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Raspberry Pi Camera</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            text-align: center;
+        }
+        #camera-feed {
+            margin: 20px 0;
+            max-width: 100%;
+            border: 2px solid #ccc;
+        }
+        .button {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 15px 32px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        .button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        #status {
+            margin: 10px 0;
+            padding: 10px;
+            display: none;
+        }
+        /* Toggle switch styles */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .slider {
+            background-color: #4CAF50;
+        }
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+        .control-group {
+            margin: 20px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        .toggle-label {
+            font-size: 16px;
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>AjaxPi Cam</h1>
+    
+    <div class="control-group">
+        <span class="toggle-label">Camera</span>
+        <label class="switch">
+            <input type="checkbox" id="cameraToggle">
+            <span class="slider"></span>
+        </label>
+    </div>
+    
+    <button id="capture" class="button" disabled>Capture Photo</button>
+    
+    <div id="status"></div>
+    <img id="camera-feed" src="" style="display: none;">
+
+    <script>
+        const toggleSwitch = document.getElementById('cameraToggle');
+        const captureButton = document.getElementById('capture');
+        const cameraFeed = document.getElementById('camera-feed');
+        const status = document.getElementById('status');
+
+        toggleSwitch.addEventListener('change', async () => {
+            if (toggleSwitch.checked) {
+                // Start camera
+                const response = await fetch('/start_camera', { method: 'POST' });
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    cameraFeed.src = '/video_feed';
+                    cameraFeed.style.display = 'block';
+                    captureButton.disabled = false;
+                } else {
+                    toggleSwitch.checked = false;
+                }
+            } else {
+                // Stop camera
+                const response = await fetch('/stop_camera', { method: 'POST' });
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    cameraFeed.src = '';
+                    cameraFeed.style.display = 'none';
+                    captureButton.disabled = true;
+                }
+            }
+        });
+
+        captureButton.addEventListener('click', async () => {
+            const response = await fetch('/capture', { method: 'POST' });
+            const data = await response.json();
+            
+            if (data.status === 'success') {
+                status.style.display = 'block';
+                status.style.backgroundColor = '#dff0d8';
+                status.textContent = `Photo captured: ${data.filename}`;
+            } else {
+                status.style.display = 'block';
+                status.style.backgroundColor = '#f2dede';
+                status.textContent = 'Error capturing photo';
+            }
+            
+            setTimeout(() => {
+                status.style.display = 'none';
+            }, 3000);
+        });
+    </script>
+</body>
+</html>
